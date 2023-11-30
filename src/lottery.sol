@@ -4,10 +4,18 @@ pragma solidity >=0.7.0;
 contract Lottery {
     address private manager;
     address[] public players;
-    uint private balance;
+    uint private balance = 0;
+    uint private maxPlayerEntry = 10;
+    uint private currentPlayerNo = 0;
 
     constructor() {
         manager = msg.sender;
+    }
+
+    //Views
+
+    function getMaxPlayerEntry() public view returns (uint) {
+        return maxPlayerEntry;
     }
 
     function getManager() public view returns (address) {
@@ -18,35 +26,58 @@ contract Lottery {
         return balance;
     }
 
+    //Errors
+
+    error NotManager();
+    error NotUser();
+    error MaxEntryLimitReached();
+    error MinimumBalanceLimitNotReached();
+
+    // Modifiers
+
     modifier onlyManagerAccess() {
-        require(
-            msg.sender == manager,
-            "Only manager can access this function!"
-        );
+        if (msg.sender != manager) {
+            revert NotManager();
+        }
         _;
     }
 
     modifier onlyUserAccess() {
-        require(msg.sender != manager, "Manager can't participate!!");
+        if (msg.sender == manager) {
+            revert NotUser();
+        }
         _;
     }
 
     modifier minimumBalance() {
-        require(msg.value >= 0.01 ether, "Minimum balance is 0.01 ether");
+        if (msg.value < 0.01 ether) {
+            revert MinimumBalanceLimitNotReached();
+        }
         _;
     }
 
-    function enterToGame() public payable onlyUserAccess minimumBalance {
-        players.push(msg.sender);
-        balance += msg.value;
+    modifier maxPlayerLimit() {
+        if (maxPlayerEntry <= currentPlayerNo) {
+            revert MaxEntryLimitReached();
+        }
+        _;
     }
 
-    function randomlyChooseWinner()
+    //Main Functions
+
+    function enterToGame()
         public
-        view
-        onlyManagerAccess
-        returns (uint winner)
+        payable
+        onlyUserAccess
+        minimumBalance
+        maxPlayerLimit
     {
+        players.push(msg.sender);
+        balance += msg.value;
+        currentPlayerNo += 1;
+    }
+
+    function randomNumGenerator() public view onlyManagerAccess returns (uint) {
         uint randomNumber = uint(
             keccak256(
                 abi.encodePacked(
@@ -56,7 +87,17 @@ contract Lottery {
                 )
             )
         );
-        return randomNumber % players.length;
+
+        return randomNumber;
+    }
+
+    function randomlyChooseWinner()
+        public
+        view
+        onlyManagerAccess
+        returns (uint winner)
+    {
+        return randomNumGenerator() % players.length;
     }
 
     function sendFundToWinner() public payable onlyManagerAccess {

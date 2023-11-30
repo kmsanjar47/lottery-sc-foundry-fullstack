@@ -14,26 +14,11 @@ import {LotteryScript} from "../script/lottery.s.sol";
 contract LotteryTest is Test {
     Lottery public lottery;
     address public USER = makeAddr("1");
+    uint public constant FUND_SENT = 0.01 ether;
 
     function setUp() external {
         LotteryScript lotteryScript = new LotteryScript();
         lottery = lotteryScript.run();
-    }
-
-    function testIfUserEnteredWithMinimumBalance() public {
-        vm.expectRevert();
-        lottery.enterToGame();
-    }
-
-    function testIfOnlyUserEnteredTheLottery() public {
-        vm.expectRevert();
-        lottery.enterToGame();
-    }
-
-    function testIfManagerAccessedSendFundToWinner() public {
-        vm.prank(USER);
-        vm.expectRevert();
-        lottery.sendFundToWinner();
     }
 
     function testIfManagerAccessedRandomlyChooseWinner() public {
@@ -45,19 +30,49 @@ contract LotteryTest is Test {
     function testEnterToGameFuntionalities() public {
         uint balanceBeforeIncrement = lottery.getBalance();
 
-        uint fundSent = 0.1 ether;
-        address userAddress = USER;
+        //Test Minimum Balance
+        vm.expectRevert();
+        lottery.enterToGame();
 
+        //Test If The User is Not Manager
+        vm.expectRevert();
+        lottery.enterToGame();
+
+        //Test If Fund And User is Updated in contract
         vm.deal(USER, 1 ether);
         vm.startPrank(USER);
-        lottery.enterToGame{value: fundSent}();
+        lottery.enterToGame{value: FUND_SENT}();
         vm.stopPrank();
 
-        if (lottery.getBalance() != (balanceBeforeIncrement + fundSent)) {
+        if (lottery.getBalance() != (balanceBeforeIncrement + FUND_SENT)) {
             revert("Balance not matched");
         }
-        if (lottery.players(0) != userAddress) {
+        if (lottery.players(0) != USER) {
             revert("Address not matched");
         }
+    }
+
+    function testSendFundToWinnerFunctionalities() public {
+        uint totalBalance = lottery.getBalance();
+
+        //Test if normal user can access this
+
+        vm.startPrank(USER);
+        vm.expectRevert();
+        lottery.sendFundToWinner();
+        vm.stopPrank();
+
+        //Test if the balance gets added
+
+        for (uint160 i = 1; i <= 10; i++) {
+            address TEMP_USER = address(i);
+            vm.deal(TEMP_USER, 1 ether);
+            vm.startPrank(TEMP_USER);
+            lottery.enterToGame{value: FUND_SENT}();
+            vm.stopPrank();
+            totalBalance += FUND_SENT;
+        }
+        uint currentBalance = lottery.getBalance();
+        assert(currentBalance == totalBalance);
     }
 }
