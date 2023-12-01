@@ -26,6 +26,10 @@ contract Lottery {
         return balance;
     }
 
+    function getCurrentPlayerNo() public view returns (uint) {
+        return currentPlayerNo;
+    }
+
     //Errors
 
     error NotManager();

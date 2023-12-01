@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.7.0;
 
-/// Tests :
-/// - [x] Test that only manager can access the sendFundToWinner function
-/// - [x] Test that only manager can access the randomlyChooseWinner function
-/// - Test that user has paid the minimum balance to enter the game
-/// - Test is the current user is manager whiel entering in a lottery
-
 import {Test, console} from "forge-std/Test.sol";
 import {Lottery} from "../src/lottery.sol";
 import {LotteryScript} from "../script/lottery.s.sol";
@@ -27,41 +21,53 @@ contract LotteryTest is Test {
         lottery.randomlyChooseWinner();
     }
 
-    function testEnterToGameFuntionalities() public {
-        uint balanceBeforeIncrement = lottery.getBalance();
+    function testIfManagerAccesedRandomNumGenerator() public {
+        vm.prank(USER);
+        vm.expectRevert();
+        lottery.randomNumGenerator();
+    }
 
+    function testIfUserSendMinBalance() public {
         //Test Minimum Balance
         vm.expectRevert();
         lottery.enterToGame();
+    }
 
-        //Test If The User is Not Manager
-        vm.expectRevert();
-        lottery.enterToGame();
+    function testIfUserNotManagerAndPLayerCountIncreased() public {
+        //Test If The User is Not Manager and player count
+        //increased
+        uint playerCountBefore = lottery.getCurrentPlayerNo();
+        vm.deal(USER, 1 ether);
+        vm.startPrank(USER);
+        lottery.enterToGame{value: 0.2 ether}();
+        vm.stopPrank();
+        console.log(playerCountBefore, lottery.getCurrentPlayerNo());
+        assert(playerCountBefore < lottery.getCurrentPlayerNo());
+    }
 
+    function testIfFundAndUserUpdated() public {
         //Test If Fund And User is Updated in contract
+        uint balanceBeforeIncrement = lottery.getBalance();
+
         vm.deal(USER, 1 ether);
         vm.startPrank(USER);
         lottery.enterToGame{value: FUND_SENT}();
         vm.stopPrank();
 
-        if (lottery.getBalance() != (balanceBeforeIncrement + FUND_SENT)) {
-            revert("Balance not matched");
-        }
-        if (lottery.players(0) != USER) {
-            revert("Address not matched");
-        }
+        assertEq(lottery.getBalance(), balanceBeforeIncrement + FUND_SENT);
+        assertEq(lottery.players(0), USER);
     }
 
-    function testSendFundToWinnerFunctionalities() public {
-        uint totalBalance = lottery.getBalance();
-
+    function testIfOnlyManagerAcessSendFundToWinner() public {
         //Test if normal user can access this
-
         vm.startPrank(USER);
         vm.expectRevert();
         lottery.sendFundToWinner();
         vm.stopPrank();
+    }
 
+    function testSendFundToWinnerFunctionalities() public {
+        uint totalBalance = lottery.getBalance();
         //Test if the balance gets added
 
         for (uint160 i = 1; i <= 10; i++) {
@@ -72,7 +78,12 @@ contract LotteryTest is Test {
             vm.stopPrank();
             totalBalance += FUND_SENT;
         }
+
         uint currentBalance = lottery.getBalance();
-        assert(currentBalance == totalBalance);
+        assertEq(currentBalance, totalBalance);
+
+        // vm.prank(lottery.getManager());
+        // lottery.sendFundToWinner();
+        // assertEq(lottery.getBalance(), 0);
     }
 }
